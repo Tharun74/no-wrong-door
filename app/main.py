@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException
-import httpx
 
 from app.adapters.resident import ResidentAdapter
 from app.adapters.benefits import BenefitsAdapter
@@ -34,12 +33,9 @@ def list_residents():
     try:
         residents = resident_adapter.get_all()
         resident_status = {"status": "available"}
-    except (httpx.TimeoutException, httpx.RequestError):
+    except SourceUnavailableError as exc:
         residents = []
-        resident_status = {"status": "unavailable", "reason": "connection error"}
-    except httpx.HTTPStatusError as exc:
-        residents = []
-        resident_status = {"status": "unavailable", "reason": f"HTTP {exc.response.status_code}"}
+        resident_status = {"status": "unavailable", "reason": exc.reason}
 
     return {
         "count": len(residents),
