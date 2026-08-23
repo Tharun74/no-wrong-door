@@ -28,11 +28,15 @@ resident does not exist.
 | Request times out | 1 retry, immediate | HTTP 200. `resident: null`. `sources.residents: {"status": "unavailable", "reason": "timeout"}` |
 | Connection refused / DNS failure | 1 retry, immediate | HTTP 200. `resident: null`. `sources.residents: {"status": "unavailable", "reason": "connection error"}` |
 
-When the Resident Index is unavailable for a single-resident lookup, the API
-still attempts the Benefits source. The caller receives whatever can be
-assembled along with both status blocks.
+When the Resident Index is unavailable for a single-resident lookup, the
+Benefits Register is not consulted at all — see "Benefits scoping" below
+for why the two are no longer queried together on that endpoint.
 
-### Benefits Register (XML source)
+### Benefits Register (XML source) — `GET /api/v1/benefits` only
+
+The failure modes below apply to the full-register endpoint. They do not
+apply to `GET /api/v1/residents/{id}`, which never queries this source —
+see "Benefits scoping" below.
 
 | Failure mode | Retries | What the caller receives |
 |---|---|---|
@@ -47,6 +51,11 @@ HTTP 200 is returned. Both `resident` and `benefits` are `null`. Both
 `sources` entries carry their individual status and reason. The caller can
 distinguish "both down at once" from "one down" by inspecting the `sources`
 block. No information is silently dropped.
+
+This applies to independent failures of `GET /api/v1/residents` and
+`GET /api/v1/benefits` as separate calls. `GET /api/v1/residents/{id}`
+can no longer report "both unavailable," since it only ever queries the
+Resident Index.
 
 ---
 
@@ -97,6 +106,24 @@ logic, the API layer, or the other adapter.
 This was deliberate preparation for the day-two change. If a third source
 is added, or an existing source's format changes, the change is contained to
 one file.
+
+---
+
+## Benefits scoping
+
+An earlier version of `GET /api/v1/residents/{id}` called
+`benefits_adapter.get_all()` directly and returned the entire 540-record
+register under every resident's `benefits` field — regardless of who was
+being looked up. That's wrong in a way that matters: it implies those
+records belong to the resident being viewed, when there's no basis for
+that claim at all.
+
+Fixed by removing the call entirely on that endpoint. `benefits` is now
+always `null` there, with `sources.benefits: {"status": "not_linked"}` and
+a reason. The full register is still reachable, unscoped and honestly
+labelled as such, via `GET /api/v1/benefits`. Nothing is hidden — the
+data a caller needs to attempt their own matching is all present, just
+not falsely pre-merged.
 
 ---
 
