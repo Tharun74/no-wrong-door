@@ -1,26 +1,43 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+
 from app.adapters.resident import ResidentAdapter
 from app.adapters.benefits import BenefitsAdapter
+from services.resident_view import ResidentViewService
 
-app = FastAPI(title = "No Wrong Door")
 
-resident_adapter = ResidentAdapter("http://127.0.0.1:8081")
-benefits_adapter = BenefitsAdapter("http://127.0.0.1:8082")
+app = FastAPI(title="No Wrong Door")
+
+
+resident_adapter = ResidentAdapter(
+    "http://127.0.0.1:8081"
+)
+
+benefits_adapter = BenefitsAdapter(
+    "http://127.0.0.1:8082"
+)
+
+resident_view_service = ResidentViewService(
+    resident_adapter,
+    benefits_adapter
+)
+
 
 @app.get("/health")
 def health():
-    return { "status" : "ok" }
+    return {"status": "ok"}
+
 
 @app.get("/api/v1/residents/{resident_id}")
-def get_resident(resident_id : str):
-    resident = resident_adapter.get_by_id(resident_id)
-    
-    if resident is None:
-        return {"error" : "resident not found"}
-    
-    return resident
+def get_resident(resident_id: str):
 
-@app.get("/api/v1/benefits")
-def get_benefits():
-    return benefits_adapter.get_all()
-    
+    result = resident_view_service.get_resident_view(
+        resident_id
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resident not found"
+        )
+
+    return result
