@@ -32,8 +32,14 @@ def health():
 @app.get("/api/v1/residents")
 def list_residents():
     try:
-        residents = resident_adapter.get_all()
-        resident_status = {"status": "available"}
+        residents, partial, partial_reason = resident_adapter.get_all()
+        if partial:
+            resident_status = {
+                "status": "degraded",
+                "reason": f"pagination stopped early: {partial_reason}",
+            }
+        else:
+            resident_status = {"status": "available"}
     except SourceUnavailableError as exc:
         residents = []
         resident_status = {"status": "unavailable", "reason": exc.reason}

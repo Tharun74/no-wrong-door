@@ -24,7 +24,7 @@ class ResidentAdapter:
                 response = httpx.get(url, timeout=self.timeout)
 
                 if response.status_code == 404:
-                    return None  # resident genuinely does not exist
+                    return None
 
                 if response.status_code >= 500:
                     last_reason = f"HTTP {response.status_code}"
@@ -69,20 +69,18 @@ class ResidentAdapter:
                         results.append(r)
 
                 if not data.get("has_more"):
-                    break
+                    return results, False, None
 
                 page += 1
             except httpx.TimeoutException:
                 if page == 1:
                     raise SourceUnavailableError("residents", "timeout")
-                break
+                return results, True, f"timeout on page {page}"
             except httpx.RequestError:
                 if page == 1:
                     raise SourceUnavailableError("residents", "connection error")
-                break
+                return results, True, f"connection error on page {page}"
             except httpx.HTTPStatusError as exc:
                 if page == 1:
                     raise SourceUnavailableError("residents", f"HTTP {exc.response.status_code}")
-                break
-
-        return results
+                return results, True, f"HTTP {exc.response.status_code} on page {page}"
