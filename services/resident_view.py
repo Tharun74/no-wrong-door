@@ -1,7 +1,7 @@
 from app.adapters.resident import ResidentAdapter
 from app.adapters.benefits import BenefitsAdapter
 from errors import SourceUnavailableError
-
+from services.matching import build_match_index, match_resident
 
 class ResidentViewService:
 
@@ -31,11 +31,31 @@ class ResidentViewService:
             "reason": "no shared identifier between sources; matching not attempted",
         }
 
+        matched_benefits = None
+        matched_benefits_status = {"status": "not_attempted"}
+
+        if resident is not None:
+            try:
+                benefits_records = self.benefits_adapter.get_all()
+                match_index = build_match_index(benefits_records)
+                record, match_status, reason = match_resident(resident, match_index)
+
+                matched_benefits = record
+                matched_benefits_status = {"status": match_status, "reason": reason}
+
+            except SourceUnavailableError as exc:
+                matched_benefits_status = {
+                    "status": "unavailable",
+                    "reason": f"could not attempt matching: {exc.reason}",
+                }
+
         return {
             "resident": resident,
             "benefits": None,
+            "matched_benefits": matched_benefits,
             "sources": {
                 "residents": resident_status,
                 "benefits": benefits_status,
+                "matched_benefits": matched_benefits_status,
             },
         }
