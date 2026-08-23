@@ -61,3 +61,20 @@ def get_resident(resident_id: str):
         )
 
     return result
+
+@app.get("/api/v1/benefits")
+def list_benefits():
+    try:
+        benefits = benefits_adapter.get_all()
+        benefits_status = {"status": "available"}
+    except SourceUnavailableError as exc:
+        benefits = []
+        benefits_status = {"status": "unavailable", "reason": exc.reason}
+
+    return {
+        "count": len(benefits),
+        "benefits": benefits,
+        "sources": {
+            "benefits": benefits_status,
+        },
+    }
