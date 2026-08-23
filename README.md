@@ -57,14 +57,22 @@ python services/rest_service.py --port 8081
 
 **Terminal B — Benefits Register (XML, port 8082)**
 ```bash
-python services/xml_service.py --port 8082
+python services/xml_service.py --port 8082 --failure-rate 0.40
 ```
 
 > **What these are:**
 > - The REST service is a paginated JSON endpoint. It intentionally returns
 >   the same record on more than one page due to an unstable sort key.
-> - The XML service is slow (0.7 – 2.4 s per request) and fails ~15% of
->   the time with a 500. Both behaviours are normal, not faults to fix.
+> - The XML service is slow (0.7 – 2.4 s per request) and fails on a
+>   configurable percentage of calls with a 500. Both behaviours are
+>   normal, not faults to fix.
+
+> **Day 2 update:** the Benefits Register's failure rate was raised to
+> **40%** partway through the build and left there permanently — the
+> command above already reflects this. The datapack's original default
+> was 15%; if you need to reproduce that for comparison, drop the
+> `--failure-rate` flag. See `DECISIONS.md` for how the API was adjusted
+> in response to this change.
 
 **macOS / Linux only — start both with one command**
 ```bash
@@ -82,6 +90,13 @@ python -m uvicorn app.main:app --port 8000
 ```
 
 The API is now available at `http://127.0.0.1:8000`.
+
+> **Port already in use / Windows `WinError 10013`:** if 8000 is refused
+> outright rather than reported as in-use, it's likely reserved by
+> Hyper-V/WSL's port exclusion range. Run
+> `netsh interface ipv4 show excludedportrange protocol=tcp` to check, or
+> just start the API on a different port (`--port 8090`) — nothing else
+> is hardcoded to 8000.
 
 ---
 
@@ -136,6 +151,32 @@ The `count` field reflects unique records only.
 
 ---
 
+### List all benefits records
+
+```
+GET /api/v1/benefits
+```
+
+```bash
+curl http://127.0.0.1:8000/api/v1/benefits
+```
+
+Returns the full Benefits Register as-is. There is no shared identifier
+with the Resident Index, so this endpoint is not scoped to any one
+resident — see below.
+
+```json
+{
+  "count": 540,
+  "benefits": [ { "ref": "AS/2024/4702", "name": "...", ... } ],
+  "sources": {
+    "benefits": {"status": "available"}
+  }
+}
+```
+
+---
+
 ### Get a single resident's unified view
 
 ```
@@ -146,8 +187,11 @@ GET /api/v1/residents/{id}
 curl http://127.0.0.1:8000/api/v1/residents/R-10394
 ```
 
-Returns the resident's record from the Resident Index together with all
-records from the Benefits Register, each with a `sources` status block.
+Returns the resident's record from the Resident Index. The Benefits
+Register has no field in common with the Resident Index, so identity
+matching across the two sources was out of scope for this submission —
+`benefits` is always `null` here, with `sources.benefits` explaining why.
+The full register is still reachable via `GET /api/v1/benefits` above.
 
 ```json
 {
@@ -162,20 +206,13 @@ records from the Benefits Register, each with a `sources` status block.
     "program_status": "Suspended",
     "last_contact": "2025-04-07"
   },
-  "benefits": [
-    {
-      "ref": "B-00091",
-      "name": "Alice Moreau",
-      "born": "1978-03-14",
-      "address": "14 Elm Street",
-      "town": "Weybridge",
-      "benefit_code": "HB",
-      "review_due": "2026-01-15"
-    }
-  ],
+  "benefits": null,
   "sources": {
     "residents": {"status": "available"},
-    "benefits": {"status": "available"}
+    "benefits": {
+      "status": "not_linked",
+      "reason": "no shared identifier between sources; matching not attempted"
+    }
   }
 }
 ```
@@ -197,22 +234,38 @@ curl http://127.0.0.1:8000/api/v1/residents/R-DOES-NOT-EXIST
 The `sources` block in every response is machine-readable. When a source
 is unavailable its field is `null` and the status block explains why.
 
-| Source state | `sources.<name>` | Data field |
-|---|---|---|
-| Responded normally | `{"status": "available"}` | full data |
-| Timed out (after 1 retry) | `{"status": "unavailable", "reason": "timeout"}` | `null` |
-| 5xx error (after 1 retry) | `{"status": "unavailable", "reason": "HTTP 500"}` | `null` |
-| Connection refused | `{"status": "unavailable", "reason": "connection error"}` | `null` |
+| Source | Timeout | Retries | On failure |
+|---|---|---|---|
+| Resident Index | 5s | 1 (2 attempts total) | `{"status": "unavailable", "reason": "timeout" \| "HTTP 5xx" \| "connection error"}` |
+| Benefits Register | 2s | 2 (3 attempts total — raised from 1 on day 2, see `DECISIONS.md`) | `{"status": "unavailable", "reason": "timeout" \| "HTTP 5xx" \| "connection error"}` |
+| Benefits Register, per-resident lookup | — | — | always `{"status": "not_linked"}` on `GET /api/v1/residents/{id}` — not a failure mode, see above |
 
-**Example — Benefits Register down:**
+> **Known limitation:** the Benefits Register's 2s timeout is tighter than
+> its own documented worst-case latency (2.4s). Some `"reason": "timeout"`
+> results reflect our timeout budget rather than the source genuinely
+> being down. Noted in `DECISIONS.md`.
+
+**Example — Benefits Register down (on `GET /api/v1/benefits`):**
 
 ```json
 {
-  "resident": { "id": "R-10394", "first_name": "Paul", ... },
+  "count": 0,
+  "benefits": [],
+  "sources": {
+    "benefits": {"status": "unavailable", "reason": "timeout"}
+  }
+}
+```
+
+**Example — Resident Index down (on `GET /api/v1/residents/{id}`):**
+
+```json
+{
+  "resident": null,
   "benefits": null,
   "sources": {
-    "residents": {"status": "available"},
-    "benefits": {"status": "unavailable", "reason": "timeout"}
+    "residents": {"status": "unavailable", "reason": "HTTP 500"},
+    "benefits": {"status": "not_linked", "reason": "no shared identifier between sources; matching not attempted"}
   }
 }
 ```
