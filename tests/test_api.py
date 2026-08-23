@@ -46,6 +46,8 @@ for i in range(1, 9):
     if ben_status == "available":
         ok_count += 1
         marker = "[OK]"
+    elif ben_status == "not_linked":
+        marker = "[NOT LINKED]"
     else:
         degraded_count += 1
         reason = data["sources"]["benefits"].get("reason", "?")

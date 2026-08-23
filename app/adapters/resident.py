@@ -54,22 +54,35 @@ class ResidentAdapter:
         page = 1
 
         while True:
-            response = httpx.get(
-                f"{self.base_url}/residents",
-                params={"page": page},
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = httpx.get(
+                    f"{self.base_url}/residents",
+                    params={"page": page},
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                data = response.json()
 
-            for r in data["results"]:
-                if r["id"] not in seen_ids:
-                    seen_ids.add(r["id"])
-                    results.append(r)
+                for r in data.get("results", []):
+                    if r["id"] not in seen_ids:
+                        seen_ids.add(r["id"])
+                        results.append(r)
 
-            if not data["has_more"]:
+                if not data.get("has_more"):
+                    break
+
+                page += 1
+            except httpx.TimeoutException:
+                if page == 1:
+                    raise SourceUnavailableError("residents", "timeout")
                 break
-
-            page += 1
+            except httpx.RequestError:
+                if page == 1:
+                    raise SourceUnavailableError("residents", "connection error")
+                break
+            except httpx.HTTPStatusError as exc:
+                if page == 1:
+                    raise SourceUnavailableError("residents", f"HTTP {exc.response.status_code}")
+                break
 
         return results
