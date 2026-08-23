@@ -75,3 +75,29 @@ print()
 print("=" * 60)
 print("  All tests complete.")
 print("=" * 60)
+
+divider("TEST 6: Tier-1 identity matching")
+MATCHED_ID = "R-10451"   # Tomas Grady — confirmed unique match in the data pack
+UNMATCHED_ID = "R-10394"  # Paul Quill — confirmed absent from the benefits register
+
+r = httpx.get(f"{BASE}/api/v1/residents/{MATCHED_ID}", timeout=25)
+data = r.json()
+print(f"  {MATCHED_ID} (expected: matched)")
+print(f"    matched_benefits status : {data['sources']['matched_benefits']}")
+print(f"    matched_benefits.ref    : {data['matched_benefits']['ref'] if data['matched_benefits'] else None}")
+
+r = httpx.get(f"{BASE}/api/v1/residents/{UNMATCHED_ID}", timeout=25)
+data = r.json()
+print(f"  {UNMATCHED_ID} (expected: no_match)")
+print(f"    matched_benefits status : {data['sources']['matched_benefits']}")
+print(f"    matched_benefits        : {data['matched_benefits']}")
+
+print()
+print("  Note: matched_benefits.status can also come back 'unavailable' if")
+print("  the register happens to fail all retries during this call — that's")
+print("  expected at a 40% base failure rate, not a bug. Re-run if so.")
+
+print()
+print("=" * 60)
+print("  All tests complete.")
+print("=" * 60)
