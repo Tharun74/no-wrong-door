@@ -14,7 +14,8 @@ resident_adapter = ResidentAdapter(
 )
 
 benefits_adapter = BenefitsAdapter(
-    "http://127.0.0.1:8082"
+    "http://127.0.0.1:8082",
+    max_retries=2,
 )
 
 resident_view_service = ResidentViewService(
