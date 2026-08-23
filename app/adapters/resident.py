@@ -16,12 +16,6 @@ class ResidentAdapter:
         self.max_retries = max_retries
 
     def get_by_id(self, resident_id: str):
-        """
-        Fetch one resident by ID.
-
-        Returns the resident dict, or None if the resident does not exist (404).
-        Raises SourceUnavailableError if the source cannot be reached after retries.
-        """
         url = f"{self.base_url}/residents/{resident_id}"
         last_reason = "unknown error"
 
@@ -55,13 +49,6 @@ class ResidentAdapter:
                 raise SourceUnavailableError("residents", last_reason)
 
     def get_all(self):
-        """
-        Fetch all residents across all pages, deduplicated by ID.
-
-        The REST source uses offset pagination with an unstable sort key, which
-        means the same record can appear on more than one page. We track seen IDs
-        in a set and skip any record we have already added to the result.
-        """
         seen_ids: set = set()
         results = []
         page = 1
