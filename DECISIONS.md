@@ -1,5 +1,18 @@
 # DECISIONS.md
 
+## Floor status
+
+All four required behaviours, verified against the live services (see
+`tests/test_api.py`):
+
+- **Graceful degradation** — never a bare 5xx from an upstream failure;
+  always `200` with a `sources` status and reason.
+- **Retry-safe / idempotent** — read-only throughout; retries replace,
+  never accumulate.
+- **Deduplication** — `620` unique residents confirmed against the live
+  REST mock, despite an unstable sort key repeating records across pages.
+- **Runs from a clean clone on the README alone** — verified end to end.
+
 ## Degradation policy
 
 **Partial data beats an error page; silence is never acceptable.** Every
@@ -86,6 +99,13 @@ unchanged; worst case is now a 6s wait, bounded.
 
 Nothing else changed — the adapter boundary absorbed the new failure rate
 entirely, which was the point of keeping sources independent.
+
+**Gotcha found and fixed in README, not in code:**
+`services/run_both.sh` (organiser-provided) defaults to the *original*
+15% rate via its own `BENEFITS_FAILURE_RATE` fallback — it does not pick
+up the day-two change automatically. `README.md` now documents the
+required override (`BENEFITS_FAILURE_RATE=0.40 bash services/run_both.sh`);
+without it, that script silently tests the wrong rate.
 
 **What we'd have done differently:** size `max_retries=2` as the original
 default rather than reacting to day 2; a short-lived cache and a circuit
