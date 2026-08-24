@@ -32,6 +32,15 @@ python services/xml_service.py --port 8082 --failure-rate 0.40
 uvicorn app.main:app --port 8000
 ```
 
+**macOS / Linux:** `services/run_both.sh` starts Terminals 1 and 2 together
+in the background, saving one window. It defaults to the *original* 15%
+failure rate, so override it to match day two:
+
+```bash
+BENEFITS_FAILURE_RATE=0.40 bash services/run_both.sh
+# then just: uvicorn app.main:app --port 8000
+```
+
 API: `http://127.0.0.1:8000` · Interactive docs: `http://127.0.0.1:8000/docs`
 
 > **Windows, port refused outright (`WinError 10013`):** likely a
@@ -42,12 +51,37 @@ API: `http://127.0.0.1:8000` · Interactive docs: `http://127.0.0.1:8000/docs`
 
 ## Endpoints
 
-| Endpoint | Returns |
-|---|---|
-| `GET /health` | Liveness check |
-| `GET /api/v1/residents` | All residents, deduplicated across pages |
-| `GET /api/v1/benefits` | Full benefits register, unscoped to any resident |
-| `GET /api/v1/residents/{id}` | One resident, plus a Tier-1 matched benefit if one is found (see below) |
+**`GET /health`** — liveness check.
+```bash
+curl http://127.0.0.1:8000/health
+# {"status": "ok"}
+```
+
+**`GET /api/v1/residents`** — every resident from the Resident Index,
+deduplicated across pages (the source occasionally repeats a record on
+more than one page). `count` reflects unique records only.
+```bash
+curl http://127.0.0.1:8000/api/v1/residents
+# {"count": 620, "residents": [...], "sources": {"residents": {"status": "available"}}}
+```
+
+**`GET /api/v1/benefits`** — the full Benefits Register, as-is. There's no
+shared key with the Resident Index, so this endpoint is intentionally not
+scoped to any one resident — it's the whole register, honestly labelled.
+```bash
+curl http://127.0.0.1:8000/api/v1/benefits
+# {"count": 540, "benefits": [...], "sources": {"benefits": {"status": "available"}}}
+```
+
+**`GET /api/v1/residents/{id}`** — one resident's unified view. `404` if
+the ID genuinely doesn't exist. `benefits` is always `null` here — see
+above, no shared key — with `sources.benefits: "not_linked"` saying so
+explicitly rather than pretending there's nothing to report. Additionally,
+as the innovation piece, `matched_benefits` holds a conservative Tier-1
+exact match (first name + last name + date of birth) when exactly one
+benefits record agrees; otherwise it's `null` with `no_match` or
+`ambiguous`, distinguishing "we tried and found nothing" from "we
+couldn't try" (`unavailable`).
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/residents/R-10451
@@ -74,12 +108,6 @@ curl http://127.0.0.1:8000/api/v1/residents/R-10451
   }
 }
 ```
-
-`benefits` is always `null` — there's no shared key between the two
-sources, so the full register is never merged into a resident's view
-(it's reachable, unscoped, at `GET /api/v1/benefits`). `matched_benefits`
-is additive: a conservative exact-match attempt on top of that honest
-default. `GET /api/v1/residents/R-DOES-NOT-EXIST` → `404`.
 
 ---
 
