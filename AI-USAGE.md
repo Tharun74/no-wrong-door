@@ -12,7 +12,9 @@ in the development environment, used as a pair-programming aid throughout
 the build window.
 
 **Claude (Anthropic)** — a conversational AI model, used to plan, analyse,
-and reason through different stages of the project before writing code.
+and reason through different stages of the project before writing code,
+including extensively ideating the identity matching concept and generating
+testing code.
 
 ---
 
@@ -24,13 +26,16 @@ suggestion before accepting it, and making all architectural calls. No AI
 output was copied directly into the repository without being read,
 understood, and in many cases edited first.
 
-### Planning and sequencing
+### Planning, sequencing, and matching ideation
 
 The overall approach — FastAPI, the adapter pattern, `SourceUnavailableError`
 as the cross-layer signal — emerged from discussion between the developer and
 Claude before any code was written. AI helped identify the gap between the
 initial scaffold and the floor requirements and proposed a sequencing order,
-which the developer revised.
+which the developer revised. Claude was also used extensively to ideate the
+identity matching concept, exploring potential strategies and evaluating
+their viability against the problem statement's strict constraints before the
+decision was made to decline matching.
 
 ### Code reviewed and accepted with edits
 
@@ -42,7 +47,7 @@ which the developer revised.
 | `app/main.py` | AI drafted `list_residents()` and the `SourceUnavailableError` catch pattern. The developer independently added `GET /api/v1/benefits` and applied the benefits-scoping fix. |
 | `README.md` | AI drafted the initial version. The developer made significant edits: updated the XML service startup command to reflect the Day 2 failure rate, added the Windows port-exclusion note (`WinError 10013`), rewrote the single-resident response example to reflect `benefits: null`, and updated the degradation table. |
 | `DECISIONS.md` | AI drafted the structure and initial tables. The developer reviewed and expanded them, added the "Benefits scoping" section independently, and wrote the Day 2 reflection. |
-| `tests/test_api.py` | AI drafted the test script; the developer verified it against the live API and committed it as part of the test evidence. |
+| `tests/test_api.py` | Claude generated the initial testing code structure; the developer verified, adapted, and refined it against the live API (avoiding blind copy-pasting) and committed it as part of the test evidence. |
 
 ---
 
@@ -114,4 +119,8 @@ drafts, and reasoning, but not trusted blindly. The developer wrote the
 initial scaffold independently, reviewed every AI output before committing,
 made all architectural and scoping decisions, and identified and fixed the
 most significant design error (the benefits-scoping bug) without any AI
-involvement.
+involvement. Furthermore, while Claude was extensively utilized to ideate
+the logic for files matching across sources and to generate initial test
+structures, the developer independently handled the integration of leftover
+endpoints and ensured all code was thoroughly adapted to the project's
+strict constraints rather than being blindly copy-pasted.
